@@ -7,6 +7,8 @@ def clean_wiki_text(text):
     clean_text=mwparserfromhell.parse(text).strip_code().strip()
     clean_text=re.sub(r'\n{3,}','\n\n',clean_text)
     clean_text=re.sub(r'Category:.*','',clean_text)
+    clean_text = re.sub(r'\n[a-z]{2}:[^\n]+', '', clean_text)
+    clean_text = re.sub(r'Hunter × Hunter[^.\n]*', '', clean_text)
     clean_text = re.sub(r'thumb\|.*?\n', '', clean_text)
     if len(clean_text.strip())>=100:
         return clean_text
@@ -35,7 +37,7 @@ if __name__ == '__main__':
                      'hunter_parsed_pages.jsonl')
 
     load_wiki_fandom('naruto.fandom.com-20260413-wikidump/naruto.fandom.com-20260413-current.xml',
-                     'naruto_parsed_pages.jsonl')
+                  'naruto_parsed_pages.jsonl')
 
     load_wiki_fandom('swordartonline.fandom.com-20260413-wikidump/swordartonline.fandom.com-20260413-current.xml',
                      'sao_parsed_pages.jsonl')
