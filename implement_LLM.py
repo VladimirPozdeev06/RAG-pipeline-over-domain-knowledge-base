@@ -14,7 +14,8 @@ def generate_response(query:str,
                       faiss_index=None,all_chunks=None,
                       name_model:str='llama-3.3-70b-versatile',
                       temperature:float=0.3,
-                      max_tokens=512):
+                      max_tokens:int=512,
+                      threshold:float=20.0):
     if faiss_index is None:
         faiss_index = faiss.read_index('faiss_index/all_fandom.faiss')
     if all_chunks is None:
