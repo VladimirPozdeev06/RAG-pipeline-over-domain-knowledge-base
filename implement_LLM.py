@@ -30,7 +30,7 @@ def generate_response(query:str,
        messages=[
            {
                'role':'system',
-               'content': 'You are expert in anime topic. Answer on question using provided content. You should obligatory use it and notify if he can not find an answer or information can be incomplete. Moreover if you find opposite information you should also say about it. Do not lye and imagine. Response only on query question.Be concise. Answer in 3-5 sentences.'
+               'content': 'You are expert in anime topic. Answer on question using provided content. You should obligatory use it and notify if he can not find an answer or information can be incomplete. Moreover if you find opposite information you should also say about it. Do not lye and imagine. Response only on query question.Do not mention provided knowledge base.Be concise. Answer in 3-5 sentences.'
            },
            {
                'role':'user',
@@ -42,7 +42,11 @@ def generate_response(query:str,
     )
     text=response.choices[0].message.content
     return text
-
+def load_chunks():
+    faiss_index = faiss.read_index('faiss_index/all_fandom.faiss')
+    with open('chunks/all_fandom_chunks.pkl', 'rb') as f:
+        all_chunks = pickle.load(f)
+    return faiss_index, all_chunks
 if __name__=='__main__':
     print(generate_response('How was the third Mizukage in Naruto?'))
     print(generate_response('How is more powerful Hisoka or Kirito?'))

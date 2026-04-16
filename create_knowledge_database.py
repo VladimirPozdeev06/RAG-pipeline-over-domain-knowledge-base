@@ -66,11 +66,7 @@ def find_relevant_chunks(query:str,top_k:int,faiss_index,all_chunks:list[str],th
         if distances[0][i] >= threshold:
             relevant_chunks.append(all_chunks[item])
     return relevant_chunks
-def load_chunks():
-    faiss_index = faiss.read_index('faiss_index/all_fandom.faiss')
-    with open('chunks/all_fandom_chunks.pkl', 'rb') as f:
-        all_chunks = pickle.load(f)
-    return faiss_index, all_chunks
+
 if __name__ == '__main__':
     '''create_embed('parsed_pages/hunter_parsed_pages.jsonl',
                  'hunter_chunks.npy',
