@@ -22,12 +22,14 @@ def generate_response(query:str,
             all_chunks=pickle.load(f)
 
     relevant_chunks=[rc['text'] for rc in find_relevant_chunks( query, top_k, faiss_index,all_chunks)]
+    if len(relevant_chunks)==0:
+        return "I can only answer questions about Hunter x Hunter, Naruto, and Sword Art Online."
     response=client.chat.completions.create(
        model=name_model,
        messages=[
            {
                'role':'system',
-               'content': 'You are expert in anime topic. Answer on question using provided content. You should obligatory use it and notify if he can not find an answer or information can be incomplete. Moreover if you find opposite information you should also say about it. Do not lye and imagine. Response only on query question.'
+               'content': 'You are expert in anime topic. Answer on question using provided content. You should obligatory use it and notify if he can not find an answer or information can be incomplete. Moreover if you find opposite information you should also say about it. Do not lye and imagine. Response only on query question.Be concise. Answer in 3-5 sentences.'
            },
            {
                'role':'user',
@@ -41,6 +43,7 @@ def generate_response(query:str,
     return text
 
 if __name__=='__main__':
-    print(generate_response('How was the first Mizukage in Naruto?'))
+    print(generate_response('How was the third Mizukage in Naruto?'))
     print(generate_response('How is more powerful Hisoka or Kirito?'))
+    print(generate_response('When will produce 200 episods of anime Hunter?'))
     print(generate_response('What will cost of the dollar in nex dday?'))

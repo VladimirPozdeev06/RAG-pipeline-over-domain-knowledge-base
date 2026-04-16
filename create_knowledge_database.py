@@ -59,11 +59,12 @@ def search_in_faiss(query:str,top_k:int,faiss_index):
     embed_query=model.encode(query).reshape(1,-1)
     distances,indices=faiss_index.search(embed_query, top_k)
     return distances,indices
-def find_relevant_chunks(query:str,top_k:int,faiss_index,all_chunks:list[str]):
+def find_relevant_chunks(query:str,top_k:int,faiss_index,all_chunks:list[str],threshold: float = 20.0):
     relevant_chunks=[]
     distances, indices = search_in_faiss(query, top_k, faiss_index)
-    for item in indices[0]:
-        relevant_chunks.append(all_chunks[item])
+    for i,item in enumerate(indices[0]):
+        if distances[0][i] >= threshold:
+            relevant_chunks.append(all_chunks[item])
     return relevant_chunks
 if __name__ == '__main__':
     '''create_embed('parsed_pages/hunter_parsed_pages.jsonl',
