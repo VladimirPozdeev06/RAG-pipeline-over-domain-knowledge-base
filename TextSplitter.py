@@ -12,11 +12,11 @@ def chunk_text(text: str, chunk_size: int = 500, overlap: int = 50) -> list[str]
             chunks.append(chunk)
 
     return chunks
-
-data_hunter=pd.read_json('hunter_parsed_pages.jsonl',lines=True)
-print(data_hunter.info())
-text=data_hunter['clean_text'].iloc[865]
-print(text)
-chunks=chunk_text(text)
-print(len(chunks))
-print(chunks)
+if __name__ == '__main__':
+    data_hunter=pd.read_json('hunter_parsed_pages.jsonl',lines=True)
+    print(data_hunter.info())
+    text=data_hunter['clean_text'].iloc[865]
+    print(text)
+    chunks=chunk_text(text)
+    print(len(chunks))
+    print(chunks)
