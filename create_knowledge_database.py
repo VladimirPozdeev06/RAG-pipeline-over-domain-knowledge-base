@@ -52,8 +52,12 @@ def search_in_faiss(query:str,top_k:int,faiss_index):
     embed_query=model.encode(query).reshape(1,-1)
     distances,indices=faiss_index.search(embed_query, top_k)
     return distances,indices
-
-
+def find_relevant_chunks(all_chunks:list,query:str,top_k:int,faiss_index):
+    relevant_chunks=[]
+    distances, indices = search_in_faiss(query, top_k, faiss_index)
+    for item in indices[0]:
+        relevant_chunks.append(all_chunks[item])
+    return relevant_chunks
 if __name__ == '__main__':
     '''create_embed('parsed_pages/hunter_parsed_pages.jsonl',
                  'hunter_chunks.npy',
@@ -73,7 +77,13 @@ if __name__ == '__main__':
     build_index('chunks/hunter_embedding_chunks.npy', 'hunter.faiss')
     build_index('chunks/naruto_embedding_chunks.npy', 'naruto.faiss')
     build_index('chunks/sao_embedding_chunks.npy', 'sao.faiss')'''
-
+    faiss_index=merge_all_faiss_index(['faiss_index/hunter.faiss','faiss_index/naruto.faiss','faiss_index/sao.faiss'])
+    all_chunks=merge_all_chunks(['chunks/hunter_chunks.npy','chunks/naruto_chunks.npy','chunks/sao_chunks.npy'])
+    distances,indices=search_in_faiss('Who was the first hokage in Naruto anime?',5,faiss_index)
+    print(distances)
+    print(indices)
+    for item in distances[0]:
+        print(all_chunks[item.astype('int')])
 
 
 
