@@ -1,4 +1,7 @@
 import numpy as np
+from datasets import Dataset
+from ragas import evaluate
+from ragas.metrics import faithfulness,answer_correctness,answer_relevancy
 def recall_k(list_of_relevant_chunks:list,list_of_chunks:list,top_k:int)->float:
     k_chunks=list_of_chunks[:top_k]
     number_relevant_chunks_in_top_k=len(set(k_chunks) &set(list_of_relevant_chunks))
@@ -41,3 +44,14 @@ def context_precision(list_of_relevant_chunks:list,list_of_chunks:list):
             sum_precision_k += relevant_c/rank
             #sum_precision_k+=precision_k(list_of_relevant_chunks,list_of_chunks,top_k=rank)
     return round(sum_precision_k/number_relevant_chunks_in_top_k,3)
+
+def compute_generation_metrics(queries:list[str],answers:list[str],chunks_from_model:list[list[str]],llm):
+    data_samples={
+        'question':queries,
+        'answer':answers,
+        'context':chunks_from_model
+    }
+    data=Dataset.from_dict(data_samples)
+    score=evaluate(data,metrics=[faithfulness,answer_correctness,answer_relevancy],llm=llm,show_progress=True)
+    return score.to_pandas()
+
