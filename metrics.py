@@ -4,7 +4,10 @@ def recall_k(list_of_relevant_chunks:list,list_of_chunks:list,top_k:int)->float:
     number_relevant_chunks_in_top_k=len(set(k_chunks) &set(list_of_relevant_chunks))
     number_relevant_chunks=len(list_of_relevant_chunks)
     return round(number_relevant_chunks_in_top_k/ number_relevant_chunks,3)
-
+def precision_k(list_of_relevant_chunks:list,list_of_chunks:list,top_k:int)->float:
+    k_chunks=list_of_chunks[:top_k]
+    number_relevant_chunks_in_top_k = len(set(k_chunks) & set(list_of_relevant_chunks))
+    return round(number_relevant_chunks_in_top_k/top_k,3)
 def hit_k(list_of_relevant_chunks:list,list_of_chunks:list,top_k:int)->int:
     k_chunks=list_of_chunks[:top_k]
     number_relevant_chunks_in_top_k = len(set(k_chunks) & set(list_of_relevant_chunks))
@@ -28,3 +31,13 @@ def MRR(list_of_relevant_chunks:list,list_of_chunks:list)->float:
             return 1/(rank+1)
     return 0.0
 
+def context_precision(list_of_relevant_chunks:list,list_of_chunks:list):
+    number_relevant_chunks_in_top_k=len(set(list_of_relevant_chunks) &set(list_of_chunks))
+    sum_precision_k=0
+    relevant_c=0
+    for rank,chunk in enumerate(list_of_chunks,start=1):
+        if chunk in list_of_relevant_chunks:
+            relevant_c+=1
+            sum_precision_k += relevant_c/rank
+            #sum_precision_k+=precision_k(list_of_relevant_chunks,list_of_chunks,top_k=rank)
+    return round(sum_precision_k/number_relevant_chunks_in_top_k,3)
