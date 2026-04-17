@@ -1,3 +1,5 @@
+from shlex import split
+
 from numpy.ma.core import indices
 from sentence_transformers import SentenceTransformer
 import json
@@ -5,7 +7,9 @@ import numpy as np
 from TextSplitter import chunk_text
 from tqdm import tqdm
 import faiss
+from rank_bm25 import BM25Okapi
 import pickle
+from typing import Literal
 model = SentenceTransformer('sentence-transformers/multi-qa-mpnet-base-dot-v1')
 def create_embed(path_to_file:str,
                  path_file_to_save_text_chunks:str,path_file_to_save_embed_chunks:str,
@@ -36,6 +40,7 @@ def build_index(path_to_embedded_chunks:str,path_to_save_index:str):
     index=faiss.IndexFlatIP(embed_chunks.shape[1])
     index.add(embed_chunks)
     faiss.write_index(index, path_to_save_index)
+
 def merge_all_faiss_index(list_path_faiss_dataset:list[str],is_save:bool=False,path_to_save:str=None):
     for i,path in enumerate(list_path_faiss_dataset):
         if i==0:
@@ -55,16 +60,27 @@ def merge_all_chunks(list_path_to_numpy_arr_with_chunks,is_save:bool=False,path_
         with open(path_to_save, 'wb') as f:
             pickle.dump(all_chunks, f)
     return all_chunks
-def search_in_faiss(query:str,top_k:int,faiss_index):
-    embed_query=model.encode(query).reshape(1,-1)
+def search_in_faiss(query,top_k:int,faiss_index,all_chunks,threshold: float = 20.0):
+    embed_query = model.encode(query).reshape(1, -1)
     distances,indices=faiss_index.search(embed_query, top_k)
-    return distances,indices
-def find_relevant_chunks(query:str,top_k:int,faiss_index,all_chunks:list[str],threshold: float = 20.0):
-    relevant_chunks=[]
-    distances, indices = search_in_faiss(query, top_k, faiss_index)
+    relevant_chunks = []
     for i,item in enumerate(indices[0]):
         if distances[0][i] >= threshold:
             relevant_chunks.append(all_chunks[item])
+    return relevant_chunks
+def search_bm_25(query:str,top_k:int,all_chunks):
+    split_query=query.lower().split()
+    tokenized_chunks=[c['text'].lower().split() for c in all_chunks]
+    bm25=BM25Okapi(tokenized_chunks)
+    relevant_chunks=bm25.get_top_n(split_query,all_chunks,top_k)
+    return relevant_chunks
+def find_relevant_chunks(query:str,top_k:int,retriever_type:Literal['faiss','bm25'],faiss_index,all_chunks:list[str],threshold: float = 20.0):
+
+    if retriever_type == 'faiss':
+        relevant_chunks = search_in_faiss(query, top_k, faiss_index,all_chunks,threshold)
+    else:
+        relevant_chunks = search_bm_25(query, top_k, all_chunks)
+
     return relevant_chunks
 
 if __name__ == '__main__':

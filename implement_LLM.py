@@ -1,7 +1,7 @@
 import os
 from dotenv import load_dotenv
 load_dotenv()
-
+from typing import Literal
 from groq import Groq
 import faiss
 import pickle
@@ -11,6 +11,7 @@ client = Groq(
 )
 def generate_response(query:str,
                       top_k:int=5,
+                      retriever_type:Literal['faiss','bm25']='faiss',
                       faiss_index=None,all_chunks=None,
                       name_model:str='llama-3.3-70b-versatile',
                       temperature:float=0.3,
@@ -22,7 +23,7 @@ def generate_response(query:str,
         with open('chunks/all_fandom_chunks.pkl', 'rb') as f:
             all_chunks=pickle.load(f)
 
-    relevant_chunks=[rc['text'] for rc in find_relevant_chunks( query, top_k, faiss_index,all_chunks)]
+    relevant_chunks=[rc['text'] for rc in find_relevant_chunks( query, top_k, retriever_type,faiss_index,all_chunks)]
     if len(relevant_chunks)==0:
         return "I can only answer questions about Hunter x Hunter, Naruto, and Sword Art Online."
     response=client.chat.completions.create(
@@ -48,7 +49,7 @@ def load_chunks():
         all_chunks = pickle.load(f)
     return faiss_index, all_chunks
 if __name__=='__main__':
-    print(generate_response('How was the third Mizukage in Naruto?'))
-    print(generate_response('How is more powerful Hisoka or Kirito?'))
-    print(generate_response('When will produce 200 episods of anime Hunter?'))
-    print(generate_response('What will cost of the dollar in nex dday?'))
+    #print(generate_response(query='How was the third Mizukage in Naruto?',retriever_type='bm25'))
+    print(generate_response(query='Who is more powerful Naruto or Subary?',retriever_type='bm25'))
+    #print(generate_response(query='When will produce 200 episods of anime Hunter?',retriever_type='bm25'))
+    #print(generate_response(query='What will cost of the dollar in nex dday?',retriever_type='bm25'))
