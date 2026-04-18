@@ -57,7 +57,7 @@ def compute_generation_metrics(llm,
                                answers:list[str]=None,
                                chunks_from_model:list[list[str]]=None,
                                ground_truth_text:list[str]=None):
-    if data_samples:
+    if data_samples is not None:
         data = Dataset.from_pandas(data_samples)
     else:
         data_samples={

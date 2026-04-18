@@ -56,6 +56,7 @@ def generate_response(query:str,
         temperature=temperature,
         max_tokens=max_tokens
     )
+    time.sleep(2)
     text=response.choices[0].message.content
     end_generate_time = time.perf_counter()
     end_e2e_latency_time = time.perf_counter()
