@@ -16,7 +16,7 @@ def create_embed(path_to_file:str,
                  path_file_to_save_text_chunks:str,path_file_to_save_embed_chunks:str,
                  source:str=None,
                  chunk_size:int=500,overlap:int=50,
-                 retriever_model:str='bge-m3',
+                 retriever_model:Literal['bge-m3','multi-e5']='bge-m3',
                  ):
     model=MODELS[retriever_model]['model']
     data = []
@@ -66,7 +66,7 @@ def merge_all_chunks(list_path_to_numpy_arr_with_chunks,is_save:bool=False,path_
         with open(path_to_save, 'wb') as f:
             pickle.dump(all_chunks, f)
     return all_chunks
-def search_in_faiss(query,top_k:int,faiss_index,all_chunks,threshold: float = 20.0,show_time:bool=False,retriever_model:str='bge-m3'):
+def search_in_faiss(query,top_k:int,faiss_index,all_chunks,threshold: float = 20.0,show_time:bool=False,return_time:bool=False,retriever_model:Literal['bge-m3','multi-e5']='bge-m3'):
     model = MODELS[retriever_model]['model']
     if retriever_model=='multi-e5':
         query='query: ' + query
@@ -75,15 +75,17 @@ def search_in_faiss(query,top_k:int,faiss_index,all_chunks,threshold: float = 20
     distances,indices=faiss_index.search(embed_query, top_k)
     end_time = time.perf_counter()
     if show_time:
-        print((end_time-start_time)*1000)
+        print(end_time-start_time)
     relevant_chunks = []
     for i,item in enumerate(indices[0]):
         if distances[0][i] >= threshold:
             relevant_chunks.append(all_chunks[item])
+    if return_time:
+        return relevant_chunks,end_time-start_time
     return relevant_chunks
-def search_bm_25(query:str,top_k:int,all_chunks,show_time:bool=False):
+def search_bm_25(query:str,top_k:int,all_chunks,tokenized_chunks,show_time:bool=False):
     split_query=query.lower().split()
-    tokenized_chunks=[c['text'].lower().split() for c in all_chunks]
+    #tokenized_chunks=[c['text'].lower().split() for c in all_chunks]
     start_time = time.perf_counter()
     bm25=BM25Okapi(tokenized_chunks)
     relevant_chunks=bm25.get_top_n(split_query,all_chunks,top_k)
@@ -91,7 +93,7 @@ def search_bm_25(query:str,top_k:int,all_chunks,show_time:bool=False):
     if show_time:
         print((end_time-start_time)*1000)
     return relevant_chunks
-def find_relevant_chunks(query:str,top_k:int,retriever_type:Literal['faiss','bm25'],faiss_index,all_chunks:list[str],retriever_model:str='bge-m3',threshold: float = 20.0):
+def find_relevant_chunks(query:str,top_k:int,retriever_type:Literal['faiss','bm25'],faiss_index,all_chunks:list[str],retriever_model:Literal['bge-m3','multi-e5']='bge-m3',threshold: float = 20.0):
 
     if retriever_type == 'faiss':
         relevant_chunks = search_in_faiss(query, top_k, faiss_index,all_chunks,threshold,retriever_model=retriever_model)
