@@ -2,6 +2,11 @@ import numpy as np
 from datasets import Dataset
 from ragas import evaluate
 from ragas.metrics import faithfulness,answer_correctness,answer_relevancy
+from ragas.llms import LangchainLLMWrapper
+from langchain_groq import ChatGroq
+import os
+from dotenv import load_dotenv
+load_dotenv()
 def recall_k(list_of_relevant_chunks:list,list_of_chunks:list,top_k:int)->float:
     k_chunks=list_of_chunks[:top_k]
     number_relevant_chunks_in_top_k=len(set(k_chunks) &set(list_of_relevant_chunks))
@@ -55,3 +60,8 @@ def compute_generation_metrics(queries:list[str],answers:list[str],chunks_from_m
     score=evaluate(data,metrics=[faithfulness,answer_correctness,answer_relevancy],llm=llm,show_progress=True)
     return score.to_pandas()
 
+def get_groq_llm_for_evaluate_using_ragas(model_name:str='llama-3.3-70b-versatile'):
+    groq_llm=ChatGroq(model=model_name,
+                      api_key=os.getenv('GROQ_API_KEY'),
+                      temperature=0)
+    return LangchainLLMWrapper(groq_llm)
