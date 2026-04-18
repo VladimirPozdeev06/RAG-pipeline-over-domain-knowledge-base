@@ -23,7 +23,7 @@ def nDCG_k(list_of_relevant_chunks:list,list_of_chunks:list,top_k:int)->float:
     ideal_length = min(top_k, len(list_of_relevant_chunks))
     IDCG = sum(1 / np.log2(rank + 1) for rank in range(1, ideal_length + 1))
     for rank,chunk in enumerate(k_chunks,start=1):
-        IDCG += (1 / np.log2(rank + 1))
+
         if chunk in list_of_relevant_chunks:
             DCG+=(1/np.log2(rank+1))
     return round(DCG/IDCG,3)

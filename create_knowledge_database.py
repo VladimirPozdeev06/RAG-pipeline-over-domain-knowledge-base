@@ -1,6 +1,3 @@
-from shlex import split
-
-from numpy.ma.core import indices
 from sentence_transformers import SentenceTransformer
 import json
 import numpy as np
@@ -9,8 +6,9 @@ from tqdm import tqdm
 import faiss
 from rank_bm25 import BM25Okapi
 import pickle
+import time
 from typing import Literal
-model = SentenceTransformer('sentence-transformers/multi-qa-mpnet-base-dot-v1')
+model = SentenceTransformer("BAAI/bge-m3")
 def create_embed(path_to_file:str,
                  path_file_to_save_text_chunks:str,path_file_to_save_embed_chunks:str,
                  source:str=None,
@@ -60,19 +58,28 @@ def merge_all_chunks(list_path_to_numpy_arr_with_chunks,is_save:bool=False,path_
         with open(path_to_save, 'wb') as f:
             pickle.dump(all_chunks, f)
     return all_chunks
-def search_in_faiss(query,top_k:int,faiss_index,all_chunks,threshold: float = 20.0):
+def search_in_faiss(query,top_k:int,faiss_index,all_chunks,threshold: float = 20.0,show_time:bool=False):
+
     embed_query = model.encode(query).reshape(1, -1)
+    start_time = time.perf_counter()
     distances,indices=faiss_index.search(embed_query, top_k)
+    end_time = time.perf_counter()
+    if show_time:
+        print((end_time-start_time)*1000)
     relevant_chunks = []
     for i,item in enumerate(indices[0]):
         if distances[0][i] >= threshold:
             relevant_chunks.append(all_chunks[item])
     return relevant_chunks
-def search_bm_25(query:str,top_k:int,all_chunks):
+def search_bm_25(query:str,top_k:int,all_chunks,show_time:bool=False):
     split_query=query.lower().split()
     tokenized_chunks=[c['text'].lower().split() for c in all_chunks]
+    start_time = time.perf_counter()
     bm25=BM25Okapi(tokenized_chunks)
     relevant_chunks=bm25.get_top_n(split_query,all_chunks,top_k)
+    end_time = time.perf_counter()
+    if show_time:
+        print((end_time-start_time)*1000)
     return relevant_chunks
 def find_relevant_chunks(query:str,top_k:int,retriever_type:Literal['faiss','bm25'],faiss_index,all_chunks:list[str],threshold: float = 20.0):
 
@@ -101,14 +108,14 @@ if __name__ == '__main__':
 
     build_index('chunks/hunter_embedding_chunks.npy', 'hunter.faiss')
     build_index('chunks/naruto_embedding_chunks.npy', 'naruto.faiss')
-    build_index('chunks/sao_embedding_chunks.npy', 'sao.faiss')'''
+    build_index('chunks/sao_embedding_chunks.npy', 'sao.faiss')
     faiss_index=merge_all_faiss_index(['faiss_index/hunter.faiss','faiss_index/naruto.faiss','faiss_index/sao.faiss'],is_save=True,path_to_save='faiss_index/all_fandom.faiss')
     all_chunks=merge_all_chunks(['chunks/hunter_chunks.npy','chunks/naruto_chunks.npy','chunks/sao_chunks.npy'],is_save=True,path_to_save='chunks/all_fandom_chunks.pkl')
     distances,indices=search_in_faiss('Who was the first hokage in Naruto anime?',5,faiss_index)
     print(distances)
     print(indices)
     for item in indices[0]:
-        print(all_chunks[item])
+        print(all_chunks[item])'''
 
 
 
