@@ -8,6 +8,8 @@ import faiss
 import pickle
 import time
 from create_knowledge_database import find_relevant_chunks
+from tqdm.notebook import tqdm
+tqdm.pandas()
 client = Groq(
     api_key=os.getenv("GROQ_API_KEY"),
 )
@@ -89,7 +91,7 @@ def oracle_retriever(path_data_to_eval:str,all_chunks:list=None,
         with open('chunks/all_fandom_chunks.pkl', 'rb') as f:
             all_chunks=pickle.load(f)
 
-    results=data.apply(lambda x: generate_response(x['question'],
+    results=data.progress_apply(lambda x: generate_response(x['question'],
                                                               all_chunks=all_chunks,
                                                               name_model=name_model,
                                                               temperature=temperature,
