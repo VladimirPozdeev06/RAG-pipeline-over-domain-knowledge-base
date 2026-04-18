@@ -35,10 +35,9 @@ def generate_response(query:str,
         relevant_chunks=[rc['text'] for rc in find_relevant_chunks( query, top_k, retriever_type,faiss_index,all_chunks,threshold)]
     else:
         if type(relevant_chunk_ids) is  int:
-            relevant_chunks=all_chunks[relevant_chunk_ids]
+            relevant_chunks=[all_chunks[relevant_chunk_ids]['text']]
         elif type(relevant_chunk_ids) is  list:
-            for ids in relevant_chunk_ids:
-                relevant_chunks.append(all_chunks[ids])
+            relevant_chunks=[all_chunks[ids]['text'] for ids in relevant_chunk_ids]
     if len(relevant_chunks)==0:
         return "I can only answer questions about Hunter x Hunter, Naruto, and Sword Art Online."
     start_generate_time = time.perf_counter()
@@ -88,7 +87,8 @@ def oracle_retriever(path_data_to_eval:str,all_chunks:list=None,
     if all_chunks is None:
         with open('chunks/all_fandom_chunks.pkl', 'rb') as f:
             all_chunks=pickle.load(f)
-    data['llm_answer'],data['generation_time'],data['e2e_latency'],data['relevant_chunks']=data.apply(lambda x: generate_response(x['question'],
+
+    results=data.apply(lambda x: generate_response(x['question'],
                                                               all_chunks=all_chunks,
                                                               name_model=name_model,
                                                               temperature=temperature,
@@ -97,8 +97,8 @@ def oracle_retriever(path_data_to_eval:str,all_chunks:list=None,
                                                               return_time=True,
                                                               is_oracle_retriever=True,
                                                               relevant_chunk_ids=x['relevant_chunk_ids']), axis=1)
-
-    return data[['question','generation_time','e2e_latency','relevant_chunks','llm_answer']]
+    data['llm_answer'], data['generation_time'], data['e2e_latency'], data['relevant_chunks']=zip(*results)
+    return data
 
 if __name__=='__main__':
     faiss_index, all_chunks=load_chunks(path_faiss_embed_chunks='bm3/faiss/all_fandom_bge-m3.faiss')
