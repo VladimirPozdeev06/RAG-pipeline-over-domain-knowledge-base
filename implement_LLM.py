@@ -41,14 +41,29 @@ def generate_response(query:str,
         elif type(relevant_chunk_ids) is  list:
             relevant_chunks=[all_chunks[ids]['text'] for ids in relevant_chunk_ids]
     if len(relevant_chunks)==0:
-        return "I can only answer questions about Hunter x Hunter, Naruto, and Sword Art Online."
+        text="I can only answer questions about Hunter x Hunter, Naruto, and Sword Art Online."
+        if is_oracle_retriever:
+            return text,0.0,0.0,[]
+        if show_time:
+            return text,0.0,0.0
+        return text
     start_generate_time = time.perf_counter()
     response=client.chat.completions.create(
        model=name_model,
        messages=[
            {
                'role':'system',
-               'content': 'You are expert in anime topic. Answer on question using provided content. You should obligatory use it and notify if he can not find an answer or information can be incomplete. Moreover if you find opposite information you should also say about it. Do not lye and imagine. Response only on query question.Do not mention provided knowledge base.Be concise. Answer in 3-5 sentences.'
+               'content': 'You are an anime knowledge expert. '
+                          'Answer questions strictly using the provided context. '
+                      
+                          ' You should obligatory use it and notify if he can not find an answer or '
+                          'information can be incomplete. '
+                          'Moreover if you find opposite information you should also say about it. '
+                          ' Response only on query question.'
+                          'Do not fabricate or assume facts. Do not mention the knowledge base.'
+                          'If the answer requires connecting multiple facts, reason step by step.'
+                         'Be concise: 1-2 sentences for simple questions, up to 4 for complex ones.'
+
            },
            {
                'role':'user',

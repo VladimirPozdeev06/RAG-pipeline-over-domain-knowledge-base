@@ -16,7 +16,7 @@ def create_embed(path_to_file:str,
                  path_file_to_save_text_chunks:str,path_file_to_save_embed_chunks:str,
                  source:str=None,
                  chunk_size:int=500,overlap:int=50,
-                 retriever_model:str='bge-,3',
+                 retriever_model:str='bge-m3',
                  ):
     model=MODELS[retriever_model]['model']
     data = []
