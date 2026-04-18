@@ -1,6 +1,7 @@
 import os
 from dotenv import load_dotenv
 load_dotenv()
+import pandas as pd
 from typing import Literal
 from groq import Groq
 import faiss
@@ -18,15 +19,26 @@ def generate_response(query:str,
                       temperature:float=0.3,
                       max_tokens:int=512,
                       threshold:float=20.0,
-                      show_time:bool=False
+                      show_time:bool=False,
+                      return_time:bool=False,
+                      is_oracle_retriever:bool=False,
+                      relevant_chunk_ids:int|list|None=None
                       ):
     if faiss_index is None:
         faiss_index = faiss.read_index('faiss_index/all_fandom.faiss')
     if all_chunks is None:
         with open('chunks/all_fandom_chunks.pkl', 'rb') as f:
             all_chunks=pickle.load(f)
+    relevant_chunks=[]
     start_e2e_latency_time=time.perf_counter()
-    relevant_chunks=[rc['text'] for rc in find_relevant_chunks( query, top_k, retriever_type,faiss_index,all_chunks,threshold)]
+    if not is_oracle_retriever:
+        relevant_chunks=[rc['text'] for rc in find_relevant_chunks( query, top_k, retriever_type,faiss_index,all_chunks,threshold)]
+    else:
+        if type(relevant_chunk_ids) is  int:
+            relevant_chunks=all_chunks[relevant_chunk_ids]
+        elif type(relevant_chunk_ids) is  list:
+            for ids in relevant_chunk_ids:
+                relevant_chunks.append(all_chunks[ids])
     if len(relevant_chunks)==0:
         return "I can only answer questions about Hunter x Hunter, Naruto, and Sword Art Online."
     start_generate_time = time.perf_counter()
@@ -48,10 +60,16 @@ def generate_response(query:str,
     text=response.choices[0].message.content
     end_generate_time = time.perf_counter()
     end_e2e_latency_time = time.perf_counter()
-    if show_time:
-        print(f'generate_time: {(end_generate_time-start_generate_time)*1000}')
-        print(f'e2e_latency: {(end_e2e_latency_time-start_e2e_latency_time)*1000}')
+    generation_time=end_generate_time-start_generate_time
+    e2e_latency=end_e2e_latency_time-start_e2e_latency_time
 
+    if show_time:
+        print(f'generate_time: {generation_time} seconds')
+        print(f'e2e_latency: {e2e_latency} seconds')
+    if is_oracle_retriever:
+        return text,generation_time,e2e_latency,relevant_chunks
+    if return_time:
+        return text,generation_time,e2e_latency
     return text
 def load_chunks(path_faiss_embed_chunks:str='faiss_index/all_fandom.faiss',
                 path_text_chunks:str='chunks/all_fandom_chunks.pkl'):
@@ -59,9 +77,34 @@ def load_chunks(path_faiss_embed_chunks:str='faiss_index/all_fandom.faiss',
     with open(path_text_chunks, 'rb') as f:
         all_chunks = pickle.load(f)
     return faiss_index, all_chunks
+
+def oracle_retriever(path_data_to_eval:str,all_chunks:list=None,
+                     name_model:str='llama-3.3-70b-versatile',
+                     temperature: float = 0.3,
+                     max_tokens: int = 512,
+
+                     ):
+    data=pd.read_json(path_data_to_eval,lines=True)
+    if all_chunks is None:
+        with open('chunks/all_fandom_chunks.pkl', 'rb') as f:
+            all_chunks=pickle.load(f)
+    data['llm_answer'],data['generation_time'],data['e2e_latency'],data['relevant_chunks']=data.apply(lambda x: generate_response(x['question'],
+                                                              all_chunks=all_chunks,
+                                                              name_model=name_model,
+                                                              temperature=temperature,
+                                                              max_tokens=max_tokens,
+
+                                                              return_time=True,
+                                                              is_oracle_retriever=True,
+                                                              relevant_chunk_ids=x['relevant_chunk_ids']), axis=1)
+
+    return data[['question','generation_time','e2e_latency','relevant_chunks','llm_answer']]
+
 if __name__=='__main__':
     faiss_index, all_chunks=load_chunks(path_faiss_embed_chunks='bm3/faiss/all_fandom_bge-m3.faiss')
     #print(generate_response(query='How was the third Mizukage in Naruto?',retriever_type='bm25'))
-    print(generate_response(query='Кто более сильный Наруто или Сасуке?',retriever_type='faiss',show_time=True))
+    #print(generate_response(query='Кто более сильный Наруто или Сасуке?',retriever_type='faiss',show_time=True,faiss_index=faiss_index,threshold=0.53))
     #print(generate_response(query='When will produce 200 episods of anime Hunter?',retriever_type='bm25'))
     #print(generate_response(query='What will cost of the dollar in nex dday?',retriever_type='bm25'))
+    data=oracle_retriever('eval_set_v3_clean.jsonl',all_chunks)
+    print(data.info())
