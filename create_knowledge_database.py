@@ -83,7 +83,7 @@ def search_in_faiss(query,top_k:int,faiss_index,all_chunks,threshold: float = 20
     if return_time:
         return relevant_chunks,end_time-start_time
     return relevant_chunks
-def search_bm_25(query:str,top_k:int,all_chunks,tokenized_chunks,show_time:bool=False):
+def search_bm_25(query:str,top_k:int,all_chunks,tokenized_chunks,show_time:bool=False,return_time:bool=False):
     split_query=query.lower().split()
     #tokenized_chunks=[c['text'].lower().split() for c in all_chunks]
     start_time = time.perf_counter()
@@ -91,7 +91,9 @@ def search_bm_25(query:str,top_k:int,all_chunks,tokenized_chunks,show_time:bool=
     relevant_chunks=bm25.get_top_n(split_query,all_chunks,top_k)
     end_time = time.perf_counter()
     if show_time:
-        print((end_time-start_time)*1000)
+        print(end_time-start_time)
+    if return_time:
+        return relevant_chunks,end_time-start_time
     return relevant_chunks
 def find_relevant_chunks(query:str,top_k:int,retriever_type:Literal['faiss','bm25'],faiss_index,all_chunks:list[str],retriever_model:Literal['bge-m3','multi-e5']='bge-m3',threshold: float = 20.0):
 
