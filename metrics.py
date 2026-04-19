@@ -5,10 +5,15 @@ from datasets import Dataset
 from ragas import evaluate
 from ragas.metrics import faithfulness,answer_correctness,answer_relevancy
 from ragas.llms import LangchainLLMWrapper
+from ragas.embeddings import LangchainEmbeddingsWrapper
+from ragas import RunConfig
+
+from langchain_huggingface import HuggingFaceEmbeddings
 from langchain_groq import ChatGroq
 import os
 from dotenv import load_dotenv
 load_dotenv()
+
 def recall_k(list_of_relevant_chunks:list,list_of_chunks:list,top_k:int)->float:
     k_chunks=list_of_chunks[:top_k]
     number_relevant_chunks_in_top_k=len(set(k_chunks) &set(list_of_relevant_chunks))
@@ -84,7 +89,19 @@ def generation_metrics(llm,
             'reference':ground_truth_text
         }
         data=Dataset.from_dict(data_samples)
-    score=evaluate(data,metrics=[faithfulness,answer_correctness,answer_relevancy],llm=llm,show_progress=True)
+    os.environ["RAGAS_DO_NOT_TRACK"] = "true"
+    embeddings = LangchainEmbeddingsWrapper(HuggingFaceEmbeddings(model_name="sentence-transformers/all-MiniLM-L6-v2"))
+    faithfulness.llm = llm
+    answer_correctness.llm = llm
+    answer_relevancy.llm = llm
+    answer_relevancy.embeddings = embeddings
+    answer_relevancy.strictness = 1
+    score=evaluate(data,
+                   metrics=[faithfulness,answer_correctness,answer_relevancy],
+                   llm=llm,
+                   show_progress=True,
+                   embeddings=embeddings,
+                   run_config=RunConfig(max_workers=1, timeout=300))
     return score.to_pandas()
 
 def get_groq_llm_for_evaluate_using_ragas(model_name:str='llama-3.3-70b-versatile'):
@@ -107,7 +124,7 @@ def compute_all_metrics(       # generation_metrics
                                answers_column: str = None,
                                chunks_column: str = None,
                                ground_truth_column: str = None,
-                               relevant_chunks_ids_column: str = None,
+                               relevant_chunks_column: str = None,
                                queries:list[str]=None,
                                answers:list[str]=None,
                                chunks_from_model:list[list[str]]=None,
@@ -130,6 +147,7 @@ def compute_all_metrics(       # generation_metrics
                                ):
 
 
+    results = {}
     if is_generation_metrics:
         llm=get_groq_llm_for_evaluate_using_ragas(model_name=model_name)
         score=generation_metrics(llm,
@@ -144,47 +162,61 @@ def compute_all_metrics(       # generation_metrics
                                ground_truth_column=ground_truth_column
         )
         print(score.mean(numeric_only=True))
+        results['generation'] = score
 
     if is_time_metrics:
         if data_samples is None or list_columns_time is None:
             raise ValueError('Both data_samples and list_columns_time should be provided.')
         compute_time_metrics(data_samples,list_columns_time)
+        results['time'] = {col: {'mean': data_samples[col].mean(),
+                                 'median': data_samples[col].median(),
+                                 'p95': data_samples[col].quantile(0.95)}
+                           for col in list_columns_time}
 
     if is_retrieval_metrics:
         if data_samples is None:
             raise ValueError(" data_samples  must be provided")
-
+        retrieval_results = {}
 
         if top_k_recall is not None:
             for k in top_k_recall:
                 mean_recall=data_samples.apply(
-                    lambda x: recall_k(x[relevant_chunks_ids_column], x[chunks_column],k),axis=1
+                    lambda x: recall_k(x[relevant_chunks_column], x[chunks_column],k),axis=1
                 ).mean()
                 print(f'top_{k}_recall: {mean_recall}')
+                retrieval_results[f'top_{k}_recall'] = mean_recall
 
         if top_k_precision is not None:
             for k in top_k_precision:
                 mean_precision = data_samples.apply(
-                    lambda x: precision_k(x[relevant_chunks_ids_column], x[chunks_column], k), axis=1
+                    lambda x: precision_k(x[relevant_chunks_column], x[chunks_column], k), axis=1
                 ).mean()
                 print(f'top_{k}_precision: {mean_precision}')
+                retrieval_results[f'top_{k}_precision'] = mean_precision
 
         if top_k_hit is not None:
             for k in top_k_hit:
                 mean_hit = data_samples.apply(
-                    lambda x: hit_k(x[relevant_chunks_ids_column], x[chunks_column], k), axis=1
+                    lambda x: hit_k(x[relevant_chunks_column], x[chunks_column], k), axis=1
                 ).mean()
                 print(f'top_{k}_hit: {mean_hit}')
+                retrieval_results[f'top_{k}_hit'] = mean_hit
 
         if top_k_nDCG is not None:
             for k in top_k_nDCG:
                 mean_nDCG = data_samples.apply(
-                    lambda x: nDCG_k(x[relevant_chunks_ids_column], x[chunks_column], k), axis=1
+                    lambda x: nDCG_k(x[relevant_chunks_column], x[chunks_column], k), axis=1
                 ).mean()
                 print(f'top_{k}_nDCG: {mean_nDCG}')
+                retrieval_results[f'top_{k}_nDCG'] = mean_nDCG
 
         if is_context_precision:
             mean_context_precision=data_samples.apply(
-                lambda x: context_precision(x[relevant_chunks_ids_column],x[chunks_column]),axis=1
+                lambda x: context_precision(x[relevant_chunks_column],x[chunks_column]),axis=1
             ).mean()
             print(f'context_precision: {mean_context_precision}')
+            retrieval_results['context_precision'] = mean_context_precision
+
+        results['retrieval'] = retrieval_results
+
+    return results if results else None
