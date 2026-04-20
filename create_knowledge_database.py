@@ -66,7 +66,7 @@ def merge_all_chunks(list_path_to_numpy_arr_with_chunks,is_save:bool=False,path_
         with open(path_to_save, 'wb') as f:
             pickle.dump(all_chunks, f)
     return all_chunks
-def search_in_faiss(query,top_k:int,faiss_index,all_chunks,threshold: float = 20.0,show_time:bool=False,return_time:bool=False,retriever_model:Literal['bge-m3','multi-e5']='bge-m3'):
+def search_in_faiss(query,top_k:int,faiss_index,all_chunks,threshold: float| None = None,show_time:bool=False,return_time:bool=False,retriever_model:Literal['bge-m3','multi-e5']='bge-m3'):
     model = MODELS[retriever_model]['model']
     if retriever_model=='multi-e5':
         query='query: ' + query
@@ -77,8 +77,8 @@ def search_in_faiss(query,top_k:int,faiss_index,all_chunks,threshold: float = 20
     if show_time:
         print(end_time-start_time)
     relevant_chunks = []
-    for i,item in enumerate(indices[0]):
-        if distances[0][i] >= threshold:
+    for i, item in enumerate(indices[0]):
+        if threshold is None or distances[0][i] >= threshold:
             relevant_chunks.append(all_chunks[item])
     if return_time:
         return relevant_chunks,end_time-start_time
