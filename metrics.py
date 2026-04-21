@@ -220,3 +220,42 @@ def compute_all_metrics(       # generation_metrics
         results['retrieval'] = retrieval_results
 
     return results if results else None
+
+def compute_agg_metrics(
+        data:pd.DataFrame,
+        #generation metrics
+        is_generation_metrics:bool=False,
+        aggregation_generation_columns:list=None,
+        generation_metrics_columns:list=None,
+
+        #time metrics
+        is_time_metrics:bool=False,
+        aggregation_time_columns:list=None,
+        time_metrics_columns:list=None,
+
+        #retriever metrics
+        is_retriever_metrics:bool=False,
+        aggregation_retriever_columns:list=None,
+        retriever_metrics_columns:list=None,
+        ):
+    if is_generation_metrics:
+        if generation_metrics_columns is None:
+            generation_metrics_columns=['faithfulness','answer_correctness','answer_relevancy']
+        for agg_column in aggregation_generation_columns:
+            agg_result=data.groupby(agg_column)[generation_metrics_columns].mean()
+            print(agg_result)
+
+    if is_time_metrics:
+        if time_metrics_columns is None:
+            time_metrics_columns=['e2e_latency','generation_time']
+        for agg_column in aggregation_time_columns:
+            agg_result=data.groupby(agg_column)[time_metrics_columns].mean()
+            print(agg_result)
+
+    if is_retriever_metrics:
+        if retriever_metrics_columns is None:
+            retriever_metrics_columns=['e2e_latency','generation_time']
+        for agg_column in aggregation_retriever_columns:
+            agg_result=data.groupby(agg_column)[retriever_metrics_columns].mean()
+            print(agg_result)
+
