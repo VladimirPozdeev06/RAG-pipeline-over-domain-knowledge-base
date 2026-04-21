@@ -1,13 +1,14 @@
 import numpy as np
 import pandas as pd
-import pickle
+import re
+import string
 from datasets import Dataset
 from ragas import evaluate
 from ragas.metrics import faithfulness,answer_correctness,answer_relevancy
 from ragas.llms import LangchainLLMWrapper
 from ragas.embeddings import LangchainEmbeddingsWrapper
 from ragas import RunConfig
-
+from bert_score import score as bert_score
 from langchain_huggingface import HuggingFaceEmbeddings
 from langchain_groq import ChatGroq
 import os
@@ -116,8 +117,38 @@ def compute_time_metrics(data:pd.DataFrame,list_columns_time:list[str]):
         print(f'{col} median: {data[col].median()}')
         print(f'{col} p95 : {data[col].quantile(0.95)}')
 
+def normalize(s):
+    s = str(s).lower()
+    s = re.sub(r'\b(a|an|the)\b', ' ', s)
+    s = ''.join(ch for ch in s if ch not in string.punctuation)
+    s = ' '.join(s.split())
+    return s
+def exact_match(answer: str, gt: str) -> int:
+
+    return int(answer == gt)
+def compute_simple_generation_metrics(data:pd.DataFrame,answer_col:str,ground_truth_col:str):
+    answer_text = data[answer_col].fillna('<empty>').astype(str).apply(normalize).tolist()
+    ground_truth_text = data[ground_truth_col].fillna('<empty>').astype(str).apply(normalize).tolist()
+
+    answer_text = [a if a.strip() else '<empty>' for a in answer_text]
+    ground_truth_text = [g if g.strip() else '<empty>' for g in ground_truth_text]
+    data['exact_match']=[exact_match(answer,gt) for answer,gt in zip(answer_text,ground_truth_text)]
+
+    P,R,F1=bert_score(answer_text,ground_truth_text,model_type='xlm-roberta-large',lang='other',verbose=True)
+
+    data['bertscore_precision'] = P.numpy()
+    data['bertscore_recall'] = R.numpy()
+    data['bertscore_f1'] = F1.numpy()
+
+    print(f"Exact Match: {data['exact_match'].mean():.3f}")
+    print(f"BERTScore F1: {data['bertscore_f1'].mean():.3f}")
+    print(f"BERTScore Precision: {data['bertscore_precision'].mean():.3f}")
+    print(f"BERTScore Recall: {data['bertscore_recall'].mean():.3f}")
+
+
 def compute_all_metrics(       # generation_metrics
                                is_generation_metrics:bool=False,
+                               is_simple_generation_metrics:bool=False,
                                model_name:str='llama-3.3-70b-versatile',
                                data_samples:pd.DataFrame=None,
                                queries_column: str = None,
@@ -163,6 +194,9 @@ def compute_all_metrics(       # generation_metrics
         )
         print(score.mean(numeric_only=True))
         results['generation'] = score
+
+    if is_simple_generation_metrics:
+        compute_simple_generation_metrics(data_samples,answers_column,ground_truth_column)
 
     if is_time_metrics:
         if data_samples is None or list_columns_time is None:
@@ -228,6 +262,9 @@ def compute_agg_metrics(
         aggregation_generation_columns:list=None,
         generation_metrics_columns:list=None,
 
+        is_simple_generation_metrics: bool = False,
+        simple_aggregation_generation_columns: list = None,
+        simple_generation_metrics_columns: list = None,
         #time metrics
         is_time_metrics:bool=False,
         aggregation_time_columns:list=None,
@@ -243,6 +280,13 @@ def compute_agg_metrics(
             generation_metrics_columns=['faithfulness','answer_correctness','answer_relevancy']
         for agg_column in aggregation_generation_columns:
             agg_result=data.groupby(agg_column)[generation_metrics_columns].mean()
+            print(agg_result)
+
+    if is_simple_generation_metrics:
+        if simple_generation_metrics_columns is None:
+            simple_generation_metrics_columns=['bertscore_precision','bertscore_recall','bertscore_f1','exact_match']
+        for agg_column in simple_aggregation_generation_columns:
+            agg_result=data.groupby(agg_column)[simple_generation_metrics_columns].mean()
             print(agg_result)
 
     if is_time_metrics:
