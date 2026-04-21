@@ -145,7 +145,9 @@ def compute_simple_generation_metrics(data:pd.DataFrame,answer_col:str,ground_tr
     print(f"BERTScore Precision: {data['bertscore_precision'].mean():.3f}")
     print(f"BERTScore Recall: {data['bertscore_recall'].mean():.3f}")
 
-
+def is_abstain(s):
+    s = str(s).lower()
+    return any(k in s for k in ['not in', 'нет данных', 'cannot', 'не могу', 'no data'])
 def compute_all_metrics(       # generation_metrics
                                is_generation_metrics:bool=False,
                                is_simple_generation_metrics:bool=False,
@@ -156,6 +158,7 @@ def compute_all_metrics(       # generation_metrics
                                chunks_column: str = None,
                                ground_truth_column: str = None,
                                relevant_chunks_column: str = None,
+                               answer_type_column:str='answer_type',
                                queries:list[str]=None,
                                answers:list[str]=None,
                                chunks_from_model:list[list[str]]=None,
@@ -172,8 +175,9 @@ def compute_all_metrics(       # generation_metrics
                                is_context_precision:bool=False,
 
                                is_time_metrics:bool=False,
-                               list_columns_time:list[str]=None
+                               list_columns_time:list[str]=None,
 
+                               is_abstention_metrics:bool=False
 
                                ):
 
@@ -252,6 +256,15 @@ def compute_all_metrics(       # generation_metrics
             retrieval_results['context_precision'] = mean_context_precision
 
         results['retrieval'] = retrieval_results
+
+    if is_abstention_metrics:
+        abst_mask = data_samples[answer_type_column] == 'abstention'
+        abst_acc = data_samples.loc[abst_mask, answers_column].apply(is_abstain).mean()
+        print(f'Точность правильных отказов: {abst_acc:.1%}')
+
+        non_abst = data_samples[data_samples[answer_type_column] != 'abstention']
+        false_abstain = non_abst[answers_column].apply(is_abstain).mean()
+        print(f'Точность ложных отказов: {false_abstain:.1%}')
 
     return results if results else None
 
