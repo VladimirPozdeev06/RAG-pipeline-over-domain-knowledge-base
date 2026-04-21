@@ -266,6 +266,11 @@ def compute_all_metrics(       # generation_metrics
         false_abstain = non_abst[answers_column].apply(is_abstain).mean()
         print(f'Точность ложных отказов: {false_abstain:.1%}')
 
+        results['abstention'] = {
+            'abstain_accuracy': abst_acc,
+            'false_abstain_rate': false_abstain
+        }
+
     return results if results else None
 
 def compute_agg_metrics(
