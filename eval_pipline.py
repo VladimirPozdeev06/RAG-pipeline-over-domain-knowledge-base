@@ -15,9 +15,10 @@ def complete_eval_pipline(
     is_alone_retriever:bool=False,
     is_print_info:bool=False,
     is_generate_answers:bool=False,
-    path_to_data_with_answers:str=None,
+    path_to_data_with_answers_oracle:str=None,
     top_k_chunks: int = 5,
     retriever_type: Literal["faiss", "bm25"] = "faiss",
+    retriever_model:Literal['bge-m3','multi-e5']='bge-m3',
     faiss_index=None,
     all_chunks=None,
     name_generation_model: str = "llama-3.3-70b-versatile",
@@ -65,7 +66,7 @@ def complete_eval_pipline(
             data = oracle_retriever(path_to_eval_set, all_chunks=None,
                                        name_model=name_generation_model)
         else:
-            data = pd.read_csv(path_to_data_with_answers)
+            data = pd.read_csv(path_to_data_with_answers_oracle)
         if is_print_info:
             print(data.info())
         data[relevant_chunks_column] = data[relevant_chunks_column].apply(parse_chunks)
@@ -104,6 +105,7 @@ def complete_eval_pipline(
                         use_few_shot=use_few_shot,
                         threshold = threshold,
                         show_time=show_time,
+                        retriever_model=retriever_model
 
                         ),axis=1)
             if return_time:

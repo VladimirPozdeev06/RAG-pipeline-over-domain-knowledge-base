@@ -174,6 +174,7 @@ def generate_response(
     query: str,
     top_k: int = 5,
     retriever_type: Literal["faiss", "bm25"] = "faiss",
+    retriever_model:Literal['bge-m3','multi-e5']='bge-m3',
     faiss_index=None,
     all_chunks=None,
     name_model: str = "llama-3.1-8b-instant",
@@ -200,7 +201,12 @@ def generate_response(
     if not is_oracle_retriever:
         relevant_chunks = [
             rc["text"]
-            for rc in find_relevant_chunks(query, top_k, retriever_type, faiss_index, all_chunks, threshold=threshold)
+            for rc in find_relevant_chunks(query,
+                                           top_k,
+                                           retriever_type,
+                                           faiss_index, all_chunks,
+                                           threshold=threshold,
+                                           retriever_model=retriever_model)
         ]
     else:
         if type(relevant_chunk_ids)==int:
