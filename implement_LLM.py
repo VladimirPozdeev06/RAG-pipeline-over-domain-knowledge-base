@@ -176,7 +176,7 @@ def generate_response(
     retriever_type: Literal["faiss", "bm25"] = "faiss",
     faiss_index=None,
     all_chunks=None,
-    name_model: str = "llama-3.3-70b-versatile",
+    name_model: str = "llama-3.1-8b-instant",
     temperature: float = 0.0,
     max_tokens: int = 256,
     threshold: float = 20.0,
@@ -213,11 +213,10 @@ def generate_response(
 
     if len(relevant_chunks) == 0:
         text = no_context_reply(query)
-        if is_oracle_retriever:
-            return text, 0.0, 0.0, []
+
         if show_time or return_time:
-            return text, 0.0, 0.0
-        return text
+            return text, 0.0, 0.0,[]
+        return text,[]
 
 
     messages = [{"role": "system", "content": SYSTEM_PROMPT}]
@@ -246,11 +245,11 @@ def generate_response(
         print(f"generate_time: {generation_time:.3f} s")
         print(f"e2e_latency:   {e2e_latency:.3f} s")
 
-    if is_oracle_retriever:
-        return text, generation_time, e2e_latency, relevant_chunks
+
+
     if return_time:
-        return text, generation_time, e2e_latency
-    return text
+        return text, generation_time, e2e_latency,relevant_chunks
+    return text,relevant_chunks
 
 
 

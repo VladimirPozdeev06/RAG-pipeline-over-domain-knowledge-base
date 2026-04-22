@@ -2,7 +2,7 @@ import json
 import ast
 from typing import Literal
 import pandas as pd
-from implement_LLM import oracle_retriever
+from implement_LLM import oracle_retriever, generate_response
 from metrics import compute_all_metrics
 def parse_chunks(val):
     try:
@@ -12,10 +12,11 @@ def parse_chunks(val):
 def complete_eval_pipline(
     path_to_eval_set:str='eval_set_v3_clean_sampled.jsonl',
     is_oracle:bool=False,
+    is_alone_retriever:bool=False,
     is_print_info:bool=False,
     is_generate_answers:bool=False,
     path_to_data_with_answers:str=None,
-    top_k: int = 5,
+    top_k_chunks: int = 5,
     retriever_type: Literal["faiss", "bm25"] = "faiss",
     faiss_index=None,
     all_chunks=None,
@@ -24,9 +25,9 @@ def complete_eval_pipline(
     max_tokens: int = 256,
     threshold: float = 20.0,
     show_time: bool = False,
-    return_time: bool = False,
-    is_oracle_retriever: bool = False,
-    relevant_chunk_ids=None,
+    return_time: bool = True,
+
+
     use_few_shot: bool = True,
     is_generation_metrics: bool = False,
     is_simple_generation_metrics: bool = False,
@@ -35,11 +36,8 @@ def complete_eval_pipline(
     answers_column: str = 'llm_answer',
     chunks_column: str ='relevant_chunks',
     ground_truth_column: str = 'ground_truth_text',
-    relevant_chunks_column: str = None,
-    queries: list[str] = None,
-    answers: list[str] = None,
-    chunks_from_model: list[list[str]] = None,
-    ground_truth_text: list[str] = None,
+    relevant_chunks_column: str = 'relevant_chunks',
+
 
     # retrieval metrics
     is_retrieval_metrics: bool = False,
@@ -56,23 +54,25 @@ def complete_eval_pipline(
 
     save_metrics_data:bool=False,
     path_to_save_metrics_data:str=None,
+    path_to_data_with_answers_retriever_alone:str=None
      ):
-
-
+    if not is_oracle and not is_alone_retriever:
+        raise ValueError('Нужно указать is_oracle=True или is_alone_retriever=True')
+    if is_time_metrics and  list_columns_time is None:
+        list_columns_time = ['generation_time', 'e2e_latency']
     if is_oracle:
         if is_generate_answers:
-            data_oracle = oracle_retriever(path_to_eval_set, all_chunks=None,
+            data = oracle_retriever(path_to_eval_set, all_chunks=None,
                                        name_model=name_generation_model)
         else:
-            data_oracle = pd.read_csv(path_to_data_with_answers)
+            data = pd.read_csv(path_to_data_with_answers)
         if is_print_info:
-            print(data_oracle.info())
-        data_oracle['relevant_chunks'] = data_oracle['relevant_chunks'].apply(parse_chunks)
-        if list_columns_time is  None:
-            list_columns_time=['generation_time', 'e2e_latency']
-        result = compute_all_metrics(is_simple_generation_metrics=is_simple_generation_metrics,
+            print(data.info())
+        data[relevant_chunks_column] = data[relevant_chunks_column].apply(parse_chunks)
+
+        metrics_result = compute_all_metrics(is_simple_generation_metrics=is_simple_generation_metrics,
                                      is_generation_metrics=is_generation_metrics,
-                                     data_samples=data_oracle,
+                                     data_samples=data,
                                      model_name=name_evaluation_model,
                                      queries_column=queries_column,
                                      answers_column=answers_column,
@@ -81,16 +81,65 @@ def complete_eval_pipline(
                                      is_time_metrics=is_time_metrics,
                                      list_columns_time=list_columns_time,
                                      is_abstention_metrics=is_abstention_metrics,
-                                     is_retrieval_metrics=False
+                                     is_retrieval_metrics=False,
+
                                      )
-        if is_generation_metrics:
-            generation_df = result['generation'][['faithfulness', 'answer_correctness', 'answer_relevancy']]
-            data_oracle_with_metrics = pd.concat([data_oracle.reset_index(drop=True), generation_df.reset_index(drop=True)],
-                                                 axis=1)
-            if path_to_save_metrics_data:
-                data_oracle_with_metrics.to_csv(path_to_save_metrics_data, index=False)
-            return data_oracle_with_metrics,result
+
+    if is_alone_retriever:
+        if is_generate_answers:
+            data=pd.read_json(path_to_eval_set,lines=True)
+            generation_results=data.progress_apply(
+                lambda x:generate_response(
+                        query=x['question'],
+                        top_k=top_k_chunks,
+                        all_chunks=all_chunks,
+                        faiss_index=faiss_index,
+                        retriever_type=retriever_type,
+                        name_model=name_generation_model,
+                        temperature=temperature,
+                        max_tokens=max_tokens,
+                        return_time=return_time,
+                        is_oracle_retriever=False,
+                        relevant_chunk_ids=x["relevant_chunk_ids"],
+                        use_few_shot=use_few_shot,
+                        threshold = threshold,
+                        show_time=show_time,
+
+                        ),axis=1)
+            if return_time:
+                data["llm_answer"], data["generation_time"], data["e2e_latency"],data[relevant_chunks_column]=zip(*generation_results)
+            else:
+                data["llm_answer"],data[relevant_chunks_column]=zip(*generation_results)
         else:
-            return data_oracle,result
+            data=pd.read_csv(path_to_data_with_answers_retriever_alone)
+        if is_print_info:
+            print(data.info())
+        metrics_result = compute_all_metrics(is_simple_generation_metrics=is_simple_generation_metrics,
+                                     is_generation_metrics=is_generation_metrics,
+                                     data_samples=data,
+                                     model_name=name_evaluation_model,
+                                     queries_column=queries_column,
+                                     answers_column=answers_column,
+                                     chunks_column=chunks_column,
+                                     ground_truth_column=ground_truth_column,
+                                     is_time_metrics=is_time_metrics,
+                                     list_columns_time=list_columns_time,
+                                     is_abstention_metrics=is_abstention_metrics,
+                                     is_retrieval_metrics=is_retrieval_metrics,
+                                     top_k_recall = top_k_recall,
+                                     top_k_precision=top_k_precision,
+                                     top_k_hit = top_k_hit,
+                                     top_k_nDCG=top_k_nDCG,
+                                     is_context_precision=is_context_precision,
+
+                                     )
+
+    if is_generation_metrics:
+        generation_df = metrics_result['generation'][['faithfulness', 'answer_correctness', 'answer_relevancy']]
+        data_with_metrics = pd.concat([data.reset_index(drop=True), generation_df.reset_index(drop=True)],
+                                             axis=1)
+        if path_to_save_metrics_data:
+            data_with_metrics.to_csv(path_to_save_metrics_data, index=False)
+        return data_with_metrics,  metrics_result
     else:
-        return 0
+        return data,  metrics_result
