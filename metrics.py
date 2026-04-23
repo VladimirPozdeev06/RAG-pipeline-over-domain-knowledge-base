@@ -218,52 +218,64 @@ def compute_all_metrics(       # generation_metrics
 
         if top_k_recall is not None:
             for k in top_k_recall:
-                mean_recall=data_samples.apply(
+                recall_column=data_samples.apply(
                     lambda x: recall_k(x[relevant_chunks_column], x[chunks_column],k),axis=1
-                ).mean()
+                )
+                data_samples[f'top_{k}_recall']=recall_column
+                mean_recall=recall_column.mean()
                 print(f'top_{k}_recall: {mean_recall}')
                 retrieval_results[f'top_{k}_recall'] = mean_recall
 
         if top_k_precision is not None:
             for k in top_k_precision:
-                mean_precision = data_samples.apply(
+                precision_column = data_samples.apply(
                     lambda x: precision_k(x[relevant_chunks_column], x[chunks_column], k), axis=1
-                ).mean()
+                )
+                data_samples[f'top_{k}_precision'] = precision_column
+                mean_precision = precision_column.mean()
                 print(f'top_{k}_precision: {mean_precision}')
                 retrieval_results[f'top_{k}_precision'] = mean_precision
 
         if top_k_hit is not None:
             for k in top_k_hit:
-                mean_hit = data_samples.apply(
+                hit_column = data_samples.apply(
                     lambda x: hit_k(x[relevant_chunks_column], x[chunks_column], k), axis=1
-                ).mean()
+                )
+                data_samples[f'top_{k}_hit'] = hit_column
+                mean_hit = hit_column.mean()
                 print(f'top_{k}_hit: {mean_hit}')
                 retrieval_results[f'top_{k}_hit'] = mean_hit
 
         if top_k_nDCG is not None:
             for k in top_k_nDCG:
-                mean_nDCG = data_samples.apply(
+                nDCG_column = data_samples.apply(
                     lambda x: nDCG_k(x[relevant_chunks_column], x[chunks_column], k), axis=1
-                ).mean()
+                )
+                data_samples[f'top_{k}_nDCG'] = nDCG_column
+                mean_nDCG = nDCG_column.mean()
                 print(f'top_{k}_nDCG: {mean_nDCG}')
                 retrieval_results[f'top_{k}_nDCG'] = mean_nDCG
 
         if is_context_precision:
-            mean_context_precision=data_samples.apply(
-                lambda x: context_precision(x[relevant_chunks_column],x[chunks_column]),axis=1
-            ).mean()
+            context_precision_column = data_samples.apply(
+                lambda x: context_precision(x[relevant_chunks_column], x[chunks_column], k), axis=1
+            )
+            data_samples['context_precision'] = context_precision_column
+            mean_context_precision = context_precision_column.mean()
             print(f'context_precision: {mean_context_precision}')
             retrieval_results['context_precision'] = mean_context_precision
 
         results['retrieval'] = retrieval_results
 
     if is_abstention_metrics:
+        data_samples['model_abstained'] = data_samples[answers_column].apply(is_abstain)
+
         abst_mask = data_samples[answer_type_column] == 'abstention'
-        abst_acc = data_samples.loc[abst_mask, answers_column].apply(is_abstain).mean()
+        abst_acc = data_samples.loc[abst_mask, 'model_abstained'].mean()
         print(f'Точность правильных отказов: {abst_acc:.1%}')
 
-        non_abst = data_samples[data_samples[answer_type_column] != 'abstention']
-        false_abstain = non_abst[answers_column].apply(is_abstain).mean()
+        non_abst_mask = data_samples[answer_type_column] != 'abstention'
+        false_abstain = data_samples.loc[non_abst_mask, 'model_abstained'].mean()
         print(f'Точность ложных отказов: {false_abstain:.1%}')
 
         results['abstention'] = {
@@ -292,32 +304,39 @@ def compute_agg_metrics(
         is_retriever_metrics:bool=False,
         aggregation_retriever_columns:list=None,
         retriever_metrics_columns:list=None,
+
+        is_abstention_metrics: bool = False,
+        aggregation_abstention_columns: list = None,
         ):
     if is_generation_metrics:
         if generation_metrics_columns is None:
             generation_metrics_columns=['faithfulness','answer_correctness','answer_relevancy']
         for agg_column in aggregation_generation_columns:
             agg_result=data.groupby(agg_column)[generation_metrics_columns].mean()
-            print(agg_result)
+            print('Generation:\n', agg_result, "\n")
 
     if is_simple_generation_metrics:
         if simple_generation_metrics_columns is None:
             simple_generation_metrics_columns=['bertscore_precision','bertscore_recall','bertscore_f1','exact_match']
         for agg_column in simple_aggregation_generation_columns:
             agg_result=data.groupby(agg_column)[simple_generation_metrics_columns].mean()
-            print(agg_result)
+            print('Simple generation:\n', agg_result, "\n")
 
     if is_time_metrics:
         if time_metrics_columns is None:
             time_metrics_columns=['e2e_latency','generation_time']
         for agg_column in aggregation_time_columns:
             agg_result=data.groupby(agg_column)[time_metrics_columns].mean()
-            print(agg_result)
+            print('Time metrics:\n', agg_result, "\n")
 
     if is_retriever_metrics:
         if retriever_metrics_columns is None:
             retriever_metrics_columns=['context_precision']
         for agg_column in aggregation_retriever_columns:
             agg_result=data.groupby(agg_column)[retriever_metrics_columns].mean()
-            print(agg_result)
+            print('Retriever metrics:\n', agg_result, "\n")
 
+    if is_abstention_metrics:
+        for agg_column in aggregation_abstention_columns:
+            agg_result = data.groupby(agg_column)['model_abstained'].mean()
+            print('Abstained metrics:\n', agg_result, "\n")
