@@ -5,7 +5,7 @@ import pickle
 import pandas as pd
 from implement_LLM import oracle_retriever, generate_response
 from metrics import compute_all_metrics
-from retriever_part import tokenized_chunks
+
 
 
 def parse_chunks(val):
@@ -15,6 +15,7 @@ def parse_chunks(val):
         return ast.literal_eval(val)
 def complete_eval_pipline(
     path_to_eval_set:str='eval_set_v3_clean_sampled.jsonl',
+    path_to_eval_set_with_chunks:str='eval_set_v3_clean_sampled_labeled.csv',
     is_oracle:bool=False,
     is_alone_retriever:bool=False,
     is_print_info:bool=False,
@@ -26,6 +27,9 @@ def complete_eval_pipline(
     faiss_index=None,
     all_chunks=None,
     tokenized_chunks=None,
+    generation_source:Literal['local','groq']='local',
+    tokenizer=None,
+    local_generation_model=None,
     name_generation_model: str = "llama-3.3-70b-versatile",
     temperature: float = 0.0,
     max_tokens: int = 256,
@@ -69,12 +73,13 @@ def complete_eval_pipline(
     if is_oracle:
         if is_generate_answers:
             data = oracle_retriever(path_to_eval_set, all_chunks=all_chunks,
-                                       name_model=name_generation_model)
+                                       name_model=name_generation_model,generation_source=generation_source,tokenizer=tokenizer,local_generation_model=local_generation_model)
         else:
             data = pd.read_csv(path_to_data_with_answers_oracle)
+            data[chunks_column] = data[chunks_column].apply(parse_chunks)
         if is_print_info:
             print(data.info())
-        data[chunks_column] = data[chunks_column].apply(parse_chunks)
+
 
         metrics_result = compute_all_metrics(is_simple_generation_metrics=is_simple_generation_metrics,
                                      is_generation_metrics=is_generation_metrics,
@@ -93,7 +98,7 @@ def complete_eval_pipline(
 
     elif is_alone_retriever:
         if is_generate_answers:
-            data=pd.read_json(path_to_eval_set,lines=True)
+            data=pd.read_csv(path_to_eval_set_with_chunks)
             if all_chunks is None:
                 with open("chunks/all_fandom_chunks.pkl", "rb") as f:
                     all_chunks = pickle.load(f)
@@ -108,6 +113,9 @@ def complete_eval_pipline(
                         tokenized_chunks=tokenized_chunks,
                         faiss_index=faiss_index,
                         retriever_type=retriever_type,
+                        generation_source=generation_source,
+                        tokenizer=tokenizer,
+                        local_generation_model=local_generation_model,
                         name_model=name_generation_model,
                         temperature=temperature,
                         max_tokens=max_tokens,
@@ -125,11 +133,15 @@ def complete_eval_pipline(
                 data["llm_answer"], data["generation_time"], data["e2e_latency"],data[chunks_column]=zip(*generation_results)
             else:
                 data["llm_answer"],data[chunks_column]=zip(*generation_results)
+            data[relevant_chunks_column] = data[relevant_chunks_column].apply(parse_chunks)
+
         else:
             data=pd.read_csv(path_to_data_with_answers_retriever_alone)
+            data[relevant_chunks_column] = data[relevant_chunks_column].apply(parse_chunks)
+            data[chunks_column] = data[chunks_column].apply(parse_chunks)
         if is_print_info:
             print(data.info())
-        data[chunks_column] = data[chunks_column].apply(parse_chunks)
+
         metrics_result = compute_all_metrics(is_simple_generation_metrics=is_simple_generation_metrics,
                                      is_generation_metrics=is_generation_metrics,
                                      data_samples=data,

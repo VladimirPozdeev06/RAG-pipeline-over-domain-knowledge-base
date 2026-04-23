@@ -6,7 +6,7 @@ from typing import Literal
 
 from dotenv import load_dotenv
 
-from retriever_part import tokenized_chunks
+from transformers import AutoTokenizer, AutoModelForCausalLM
 
 load_dotenv()
 
@@ -176,12 +176,15 @@ def format_user_message(query: str, relevant_chunks: list) -> str:
 def generate_response(
     query: str,
     top_k: int = 5,
+    generation_source:Literal['local','groq']='local',
     retriever_type: Literal["faiss", "bm25"] = "faiss",
     retriever_model:Literal['bge-m3','multi-e5']='bge-m3',
     faiss_index=None,
     all_chunks=None,
     tokenized_chunks=None,
     name_model: str = "llama-3.1-8b-instant",
+    tokenizer=None,
+    local_generation_model=None,
     temperature: float = 0.0,
     max_tokens: int = 256,
     threshold = None,
@@ -233,21 +236,31 @@ def generate_response(
     if use_few_shot:
         messages.extend(FEW_SHOT_MESSAGES)
     messages.append({"role": "user", "content": format_user_message(query, relevant_chunks)})
-
-
     start_generate_time = time.perf_counter()
-    response = client.chat.completions.create(
-        model=name_model,
-        messages=messages,
-        temperature=temperature,
-        max_tokens=max_tokens,
-    )
+    if generation_source=='groq':
+
+        response = client.chat.completions.create(
+            model=name_model,
+            messages=messages,
+            temperature=temperature,
+            max_tokens=max_tokens,
+        )
 
 
-    text = response.choices[0].message.content.strip()
+        text = response.choices[0].message.content.strip()
+    elif generation_source=='local':
+        device=local_generation_model.device
+        inputs=tokenizer.apply_chat_template(messages,return_tensors='pt').to(device)
+        output=local_generation_model.generate(inputs,
+                                               temperature=temperature,
+                                               max_new_tokens=max_tokens)
+        text=tokenizer.decode(output[0][inputs.shape[1]:],skip_special_tokens=True)
+
+
     end_generate_time = time.perf_counter()
     end_e2e_latency_time = time.perf_counter()
-    time.sleep(2)
+    if generation_source=='groq':
+        time.sleep(2)
     generation_time = end_generate_time - start_generate_time
     e2e_latency = end_e2e_latency_time - start_e2e_latency_time
 
@@ -275,6 +288,9 @@ def load_chunks(
 def oracle_retriever(
     path_data_to_eval: str,
     all_chunks=None,
+    generation_source:Literal['local','groq']='local',
+    tokenizer=None,
+    local_generation_model=None,
     name_model: str = "llama-3.3-70b-versatile",
     temperature: float = 0.0,
     max_tokens: int = 256,
@@ -289,6 +305,9 @@ def oracle_retriever(
         lambda x: generate_response(
             x["question"],
             all_chunks=all_chunks,
+            generation_source=generation_source,
+            tokenizer=tokenizer,
+            local_generation_model=local_generation_model,
             name_model=name_model,
             temperature=temperature,
             max_tokens=max_tokens,
