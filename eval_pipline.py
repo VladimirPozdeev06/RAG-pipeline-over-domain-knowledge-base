@@ -1,9 +1,13 @@
 import json
 import ast
 from typing import Literal
+import pickle
 import pandas as pd
 from implement_LLM import oracle_retriever, generate_response
 from metrics import compute_all_metrics
+from retriever_part import tokenized_chunks
+
+
 def parse_chunks(val):
     try:
         return json.loads(val)
@@ -21,10 +25,11 @@ def complete_eval_pipline(
     retriever_model:Literal['bge-m3','multi-e5']='bge-m3',
     faiss_index=None,
     all_chunks=None,
+    tokenized_chunks=None,
     name_generation_model: str = "llama-3.3-70b-versatile",
     temperature: float = 0.0,
     max_tokens: int = 256,
-    threshold: float = 20.0,
+    threshold = None,
     show_time: bool = False,
     return_time: bool = True,
 
@@ -35,7 +40,7 @@ def complete_eval_pipline(
     name_evaluation_model: str = 'llama-3.3-70b-versatile',
     queries_column: str = 'question',
     answers_column: str = 'llm_answer',
-    chunks_column: str ='relevant_chunks',
+    chunks_column: str ='chunks_from_retrieval',
     ground_truth_column: str = 'ground_truth_text',
     relevant_chunks_column: str = 'relevant_chunks',
 
@@ -63,13 +68,13 @@ def complete_eval_pipline(
         list_columns_time = ['generation_time', 'e2e_latency']
     if is_oracle:
         if is_generate_answers:
-            data = oracle_retriever(path_to_eval_set, all_chunks=None,
+            data = oracle_retriever(path_to_eval_set, all_chunks=all_chunks,
                                        name_model=name_generation_model)
         else:
             data = pd.read_csv(path_to_data_with_answers_oracle)
         if is_print_info:
             print(data.info())
-        data[relevant_chunks_column] = data[relevant_chunks_column].apply(parse_chunks)
+        data[chunks_column] = data[chunks_column].apply(parse_chunks)
 
         metrics_result = compute_all_metrics(is_simple_generation_metrics=is_simple_generation_metrics,
                                      is_generation_metrics=is_generation_metrics,
@@ -86,14 +91,21 @@ def complete_eval_pipline(
 
                                      )
 
-    if is_alone_retriever:
+    elif is_alone_retriever:
         if is_generate_answers:
             data=pd.read_json(path_to_eval_set,lines=True)
+            if all_chunks is None:
+                with open("chunks/all_fandom_chunks.pkl", "rb") as f:
+                    all_chunks = pickle.load(f)
+            if tokenized_chunks is None:
+
+                tokenized_chunks = [c['text'].lower().split() for c in all_chunks]
             generation_results=data.progress_apply(
                 lambda x:generate_response(
                         query=x['question'],
                         top_k=top_k_chunks,
                         all_chunks=all_chunks,
+                        tokenized_chunks=tokenized_chunks,
                         faiss_index=faiss_index,
                         retriever_type=retriever_type,
                         name_model=name_generation_model,
@@ -108,14 +120,16 @@ def complete_eval_pipline(
                         retriever_model=retriever_model
 
                         ),axis=1)
+
             if return_time:
-                data["llm_answer"], data["generation_time"], data["e2e_latency"],data[relevant_chunks_column]=zip(*generation_results)
+                data["llm_answer"], data["generation_time"], data["e2e_latency"],data[chunks_column]=zip(*generation_results)
             else:
-                data["llm_answer"],data[relevant_chunks_column]=zip(*generation_results)
+                data["llm_answer"],data[chunks_column]=zip(*generation_results)
         else:
             data=pd.read_csv(path_to_data_with_answers_retriever_alone)
         if is_print_info:
             print(data.info())
+        data[chunks_column] = data[chunks_column].apply(parse_chunks)
         metrics_result = compute_all_metrics(is_simple_generation_metrics=is_simple_generation_metrics,
                                      is_generation_metrics=is_generation_metrics,
                                      data_samples=data,
@@ -124,6 +138,7 @@ def complete_eval_pipline(
                                      answers_column=answers_column,
                                      chunks_column=chunks_column,
                                      ground_truth_column=ground_truth_column,
+                                     relevant_chunks_column=relevant_chunks_column,
                                      is_time_metrics=is_time_metrics,
                                      list_columns_time=list_columns_time,
                                      is_abstention_metrics=is_abstention_metrics,

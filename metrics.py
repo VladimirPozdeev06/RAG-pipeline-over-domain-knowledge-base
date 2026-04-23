@@ -316,7 +316,7 @@ def compute_agg_metrics(
 
     if is_retriever_metrics:
         if retriever_metrics_columns is None:
-            retriever_metrics_columns=['e2e_latency','generation_time']
+            retriever_metrics_columns=['context_precision']
         for agg_column in aggregation_retriever_columns:
             agg_result=data.groupby(agg_column)[retriever_metrics_columns].mean()
             print(agg_result)

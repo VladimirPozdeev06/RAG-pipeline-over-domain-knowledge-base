@@ -95,12 +95,16 @@ def search_bm_25(query:str,top_k:int,all_chunks,tokenized_chunks,show_time:bool=
     if return_time:
         return relevant_chunks,end_time-start_time
     return relevant_chunks
-def find_relevant_chunks(query:str,top_k:int,retriever_type:Literal['faiss','bm25'],faiss_index,all_chunks:list[str],retriever_model:Literal['bge-m3','multi-e5']='bge-m3',threshold: float = 20.0):
+def find_relevant_chunks(query:str,
+                         top_k:int,
+                         retriever_type:Literal['faiss','bm25'],
+                         faiss_index,all_chunks:list[str], tokenized_chunks,
+                         retriever_model:Literal['bge-m3','multi-e5']='bge-m3',threshold: float|None = None):
 
     if retriever_type == 'faiss':
         relevant_chunks = search_in_faiss(query, top_k, faiss_index,all_chunks,threshold,retriever_model=retriever_model)
     else:
-        relevant_chunks = search_bm_25(query, top_k, all_chunks)
+        relevant_chunks = search_bm_25(query, top_k, all_chunks,tokenized_chunks)
 
     return relevant_chunks
 

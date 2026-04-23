@@ -5,6 +5,9 @@ import pickle
 from typing import Literal
 
 from dotenv import load_dotenv
+
+from retriever_part import tokenized_chunks
+
 load_dotenv()
 
 import pandas as pd
@@ -177,10 +180,11 @@ def generate_response(
     retriever_model:Literal['bge-m3','multi-e5']='bge-m3',
     faiss_index=None,
     all_chunks=None,
+    tokenized_chunks=None,
     name_model: str = "llama-3.1-8b-instant",
     temperature: float = 0.0,
     max_tokens: int = 256,
-    threshold: float = 20.0,
+    threshold = None,
     show_time: bool = False,
     return_time: bool = False,
     is_oracle_retriever: bool = False,
@@ -204,7 +208,7 @@ def generate_response(
             for rc in find_relevant_chunks(query,
                                            top_k,
                                            retriever_type,
-                                           faiss_index, all_chunks,
+                                           faiss_index=faiss_index, all_chunks=all_chunks, tokenized_chunks=tokenized_chunks,
                                            threshold=threshold,
                                            retriever_model=retriever_model)
         ]
@@ -239,11 +243,11 @@ def generate_response(
         max_tokens=max_tokens,
     )
 
-    time.sleep(2)
+
     text = response.choices[0].message.content.strip()
     end_generate_time = time.perf_counter()
     end_e2e_latency_time = time.perf_counter()
-
+    time.sleep(2)
     generation_time = end_generate_time - start_generate_time
     e2e_latency = end_e2e_latency_time - start_e2e_latency_time
 
