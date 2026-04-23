@@ -1,3 +1,4 @@
+import ast
 import os
 import re
 import time
@@ -250,11 +251,11 @@ def generate_response(
         text = response.choices[0].message.content.strip()
     elif generation_source=='local':
         device=local_generation_model.device
-        inputs=tokenizer.apply_chat_template(messages,return_tensors='pt').to(device)
-        output=local_generation_model.generate(inputs,
+        inputs=tokenizer.apply_chat_template(messages,return_tensors='pt',return_dict=True).to(device)
+        output=local_generation_model.generate(**inputs,
                                                temperature=temperature,
                                                max_new_tokens=max_tokens)
-        text=tokenizer.decode(output[0][inputs.shape[1]:],skip_special_tokens=True)
+        text=tokenizer.decode(output[0][inputs['input_ids'].shape[1]:],skip_special_tokens=True)
 
 
     end_generate_time = time.perf_counter()
@@ -296,7 +297,10 @@ def oracle_retriever(
     max_tokens: int = 256,
     use_few_shot: bool = True,
 ):
-    data = pd.read_json(path_data_to_eval, lines=True)
+    data = pd.read_csv(path_data_to_eval) if path_data_to_eval.endswith('.csv') else pd.read_json(path_data_to_eval, lines=True)
+    data["relevant_chunk_ids"] = data["relevant_chunk_ids"].apply(
+        lambda x: ast.literal_eval(x) if isinstance(x, str) else x
+    )
     if all_chunks is None:
         with open("chunks/all_fandom_chunks.pkl", "rb") as f:
             all_chunks = pickle.load(f)
