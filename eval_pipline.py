@@ -5,8 +5,7 @@ import pickle
 import pandas as pd
 from implement_LLM import oracle_retriever, generate_response
 from metrics import compute_all_metrics
-
-
+from prepare_data import lemmatize_en
 
 def parse_chunks(val):
     try:
@@ -104,7 +103,7 @@ def complete_eval_pipline(
                     all_chunks = pickle.load(f)
             if tokenized_chunks is None:
 
-                tokenized_chunks = [c['text'].lower().split() for c in all_chunks]
+                tokenized_chunks = [lemmatize_en(c['text']) for c in all_chunks]
             generation_results=data.progress_apply(
                 lambda x:generate_response(
                         query=x['question'],

@@ -8,6 +8,7 @@ from rank_bm25 import BM25Okapi
 import pickle
 import time
 from typing import Literal
+from prepare_data import detect_english_text, lemmatize_en, lemmatize_ru
 MODELS = {
     'bge-m3': {'model': SentenceTransformer("BAAI/bge-m3")},
     'multi-e5': {'model': SentenceTransformer("intfloat/multilingual-e5-base")}
@@ -84,7 +85,10 @@ def search_in_faiss(query,top_k:int,faiss_index,all_chunks,threshold: float| Non
         return relevant_chunks,end_time-start_time
     return relevant_chunks
 def search_bm_25(query:str,top_k:int,all_chunks,tokenized_chunks,show_time:bool=False,return_time:bool=False):
-    split_query=query.lower().split()
+    if detect_english_text(query, min_confidence=0.8):
+        split_query = lemmatize_en(query)
+    else:
+        split_query = lemmatize_ru(query)
     #tokenized_chunks=[c['text'].lower().split() for c in all_chunks]
     start_time = time.perf_counter()
     bm25=BM25Okapi(tokenized_chunks)

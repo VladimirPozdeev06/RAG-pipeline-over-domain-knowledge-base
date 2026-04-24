@@ -2,6 +2,14 @@ import xml.etree.ElementTree as ET
 import mwparserfromhell
 import re
 import json
+from langdetect import DetectorFactory,detect_langs,LangDetectException
+import spacy
+import pymorphy3
+
+nlp = spacy.load("en_core_web_sm", disable=["parser", "ner"])
+morph = pymorphy3.MorphAnalyzer()
+
+
 NAMESPACE='{http://www.mediawiki.org/xml/export-0.11/}'
 def clean_wiki_text(text):
     clean_text=mwparserfromhell.parse(text).strip_code().strip()
@@ -32,6 +40,26 @@ def load_wiki_fandom(path_to_xml:str,path_to_json_file:str):
 
 
 
+
+def detect_english_text(text:str,min_confidence:float):
+    DetectorFactory.seed = 0
+    if len(text.strip()) <=3:
+        return False
+    try:
+        langs=detect_langs(text)
+        for lang in langs:
+            if lang.lang=='en' and lang.prob>=min_confidence:
+                return True
+        return False
+    except LangDetectException as e:
+        return False
+def lemmatize_en(text: str) -> list[str]:
+    doc = nlp(text.lower())
+    return [t.lemma_ for t in doc if not t.is_stop and not t.is_punct and t.lemma_.strip()]
+
+def lemmatize_ru(text: str) -> list[str]:
+    tokens = re.findall(r'\b[а-яёА-ЯЁ]+\b', text.lower())
+    return [morph.parse(t)[0].normal_form for t in tokens]
 if __name__ == '__main__':
     load_wiki_fandom('hunterxhunter.fandom.com-20260413-wikidump/hunterxhunter.fandom.com-20260413-current.xml',
                      'hunter_parsed_pages.jsonl')
