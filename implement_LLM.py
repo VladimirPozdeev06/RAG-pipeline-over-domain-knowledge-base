@@ -192,6 +192,7 @@ def generate_response(
     show_time: bool = False,
     return_time: bool = False,
     is_oracle_retriever: bool = False,
+    is_hybrid:bool=False,
     relevant_chunk_ids=None,
     use_few_shot: bool = True,
 
@@ -214,6 +215,7 @@ def generate_response(
                                            retriever_type,
                                            faiss_index=faiss_index, all_chunks=all_chunks, tokenized_chunks=tokenized_chunks,
                                            threshold=threshold,
+                                           is_hybrid=is_hybrid,
                                            retriever_model=retriever_model)
         ]
     else:
@@ -253,7 +255,7 @@ def generate_response(
         device=local_generation_model.device
         inputs=tokenizer.apply_chat_template(messages,return_tensors='pt',return_dict=True).to(device)
         output=local_generation_model.generate(**inputs,
-                                               temperature=temperature,
+                                               do_sample=False,
                                                max_new_tokens=max_tokens)
         text=tokenizer.decode(output[0][inputs['input_ids'].shape[1]:],skip_special_tokens=True)
 

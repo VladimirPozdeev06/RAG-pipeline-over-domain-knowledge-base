@@ -3,10 +3,16 @@ import mwparserfromhell
 import re
 import json
 from langdetect import DetectorFactory,detect_langs,LangDetectException
-import spacy
 import pymorphy3
 
-nlp = spacy.load("en_core_web_sm", disable=["parser", "ner"])
+import nltk
+from nltk.stem import WordNetLemmatizer
+from nltk.corpus import stopwords
+nltk.download('wordnet', quiet=True)
+nltk.download('stopwords', quiet=True)
+
+lemmatizer = WordNetLemmatizer()
+stopwords_en = set(stopwords.words('english'))
 morph = pymorphy3.MorphAnalyzer()
 
 
@@ -54,8 +60,12 @@ def detect_english_text(text:str,min_confidence:float):
     except LangDetectException as e:
         return False
 def lemmatize_en(text: str) -> list[str]:
-    doc = nlp(text.lower())
-    return [t.lemma_ for t in doc if not t.is_stop and not t.is_punct and t.lemma_.strip()]
+    tokens = re.findall(r'\b[a-zA-Z]+\b', text.lower())
+    return [
+        lemmatizer.lemmatize(t)
+        for t in tokens
+        if t not in stopwords_en and len(t) > 1
+    ]
 
 def lemmatize_ru(text: str) -> list[str]:
     tokens = re.findall(r'\b[а-яёА-ЯЁ]+\b', text.lower())

@@ -5,7 +5,7 @@ import pickle
 import pandas as pd
 from implement_LLM import oracle_retriever, generate_response
 from metrics import compute_all_metrics
-from prepare_data import lemmatize_en
+
 
 def parse_chunks(val):
     try:
@@ -22,6 +22,7 @@ def complete_eval_pipline(
     path_to_data_with_answers_oracle:str=None,
     top_k_chunks: int = 5,
     retriever_type: Literal["faiss", "bm25"] = "faiss",
+    is_hybrid: bool = False,
     retriever_model:Literal['bge-m3','multi-e5']='bge-m3',
     faiss_index=None,
     all_chunks=None,
@@ -101,9 +102,8 @@ def complete_eval_pipline(
             if all_chunks is None:
                 with open("chunks/all_fandom_chunks.pkl", "rb") as f:
                     all_chunks = pickle.load(f)
-            if tokenized_chunks is None:
-
-                tokenized_chunks = [lemmatize_en(c['text']) for c in all_chunks]
+            if tokenized_chunks is None and (retriever_type == 'bm25' or is_hybrid):
+                tokenized_chunks = [c['text'].lower().split() for c in all_chunks]
             generation_results=data.progress_apply(
                 lambda x:generate_response(
                         query=x['question'],
@@ -124,7 +124,8 @@ def complete_eval_pipline(
                         use_few_shot=use_few_shot,
                         threshold = threshold,
                         show_time=show_time,
-                        retriever_model=retriever_model
+                        retriever_model=retriever_model,
+                        is_hybrid=is_hybrid
 
                         ),axis=1)
 
