@@ -1,4 +1,4 @@
-from sentence_transformers import SentenceTransformer
+from sentence_transformers import SentenceTransformer, CrossEncoder
 import json
 import numpy as np
 from TextSplitter import chunk_text
@@ -14,6 +14,7 @@ MODELS = {
     'bge-m3': {'model': SentenceTransformer("BAAI/bge-m3")},
     'multi-e5': {'model': SentenceTransformer("intfloat/multilingual-e5-base")}
 }
+reranker = CrossEncoder('BAAI/bge-reranker-base')
 def create_embed(path_to_file:str,
                  path_file_to_save_text_chunks:str,path_file_to_save_embed_chunks:str,
                  source:str=None,
@@ -85,37 +86,48 @@ def search_in_faiss(query,top_k:int,faiss_index,all_chunks,threshold: float| Non
     if return_time:
         return relevant_chunks,end_time-start_time
     return relevant_chunks
-def search_bm_25(query:str,top_k:int,all_chunks,tokenized_chunks,show_time:bool=False,return_time:bool=False):
+def search_bm_25(query:str,top_k:int,all_chunks=None,bm25_index=None,tokenized_chunks=None,show_time:bool=False,return_time:bool=False):
     if detect_english_text(query, min_confidence=0.8):
         split_query = lemmatize_en(query)
     else:
         split_query = lemmatize_ru(query)
     #tokenized_chunks=[c['text'].lower().split() for c in all_chunks]
     start_time = time.perf_counter()
-    bm25=BM25Okapi(tokenized_chunks)
-    relevant_chunks=bm25.get_top_n(split_query,all_chunks,top_k)
+
+    relevant_chunks=bm25_index.get_top_n(split_query,all_chunks,top_k)
     end_time = time.perf_counter()
     if show_time:
         print(end_time-start_time)
     if return_time:
         return relevant_chunks,end_time-start_time
     return relevant_chunks
-def find_relevant_chunks(query:str,
-                         top_k:int,
+def rerank(query:str,relevant_chunks:list,top_k:int):
+    pairs=[(query,c['text']) for c in relevant_chunks]
+    scorer=reranker.predict(pairs)
+    ranked=sorted(zip(scorer,relevant_chunks),key = lambda x: x[0],reverse=True)
+    return [chunk for score,chunk in ranked[:top_k]]
 
-                         retriever_type:Literal['faiss','bm25'],
-                         faiss_index,all_chunks:list[str], tokenized_chunks,
-                         retriever_model:Literal['bge-m3','multi-e5']='bge-m3',
-                         is_hybrid:bool=False,
-                         k_rrf_hybrid:int=60,
-                         threshold: float|None = None):
-    if  is_hybrid:
+
+def find_relevant_chunks(query: str,
+                         top_k: int,
+
+                         retriever_type: Literal['faiss', 'bm25'],
+                         faiss_index, all_chunks: list[str], tokenized_chunks,
+                         retriever_model: Literal['bge-m3', 'multi-e5'] = 'bge-m3',
+                         is_hybrid: bool = False,
+                         k_rrf_hybrid: int = 60,
+                         threshold: float | None = None,
+                         use_reranker: bool = False,
+                         top_k_for_reranker: int = 5):
+    if is_hybrid:
         relevant_chunks_faiss = search_in_faiss(query, top_k, faiss_index, all_chunks, threshold,
-                                          retriever_model=retriever_model)
-        relevant_chunks_faiss_ranks=[(1/(k_rrf_hybrid+rank),chunk) for rank,chunk in enumerate(relevant_chunks_faiss) ]
+                                                retriever_model=retriever_model)
+        relevant_chunks_faiss_ranks = [(1 / (k_rrf_hybrid + rank), chunk) for rank, chunk in
+                                       enumerate(relevant_chunks_faiss)]
 
         relevant_chunks_bm25 = search_bm_25(query, top_k, all_chunks, tokenized_chunks)
-        relevant_chunks_bm25_ranks = [(1 / (k_rrf_hybrid + rank), chunk) for rank, chunk in enumerate(relevant_chunks_bm25)]
+        relevant_chunks_bm25_ranks = [(1 / (k_rrf_hybrid + rank), chunk) for rank, chunk in
+                                      enumerate(relevant_chunks_bm25)]
 
         scores = defaultdict(float)
         id_to_chunk = {}
@@ -130,15 +142,17 @@ def find_relevant_chunks(query:str,
 
         relevant = sorted(scores.items(), key=lambda x: x[1], reverse=True)
         relevant_chunks = [id_to_chunk[cid] for cid, score in relevant[:top_k]]
-        return relevant_chunks
+
 
     else:
         if retriever_type == 'faiss':
-            relevant_chunks = search_in_faiss(query, top_k, faiss_index,all_chunks,threshold,retriever_model=retriever_model)
+            relevant_chunks = search_in_faiss(query, top_k, faiss_index, all_chunks, threshold,
+                                              retriever_model=retriever_model)
         else:
-            relevant_chunks = search_bm_25(query, top_k, all_chunks,tokenized_chunks)
-
-        return relevant_chunks
+            relevant_chunks = search_bm_25(query, top_k, all_chunks, tokenized_chunks)
+    if use_reranker:
+        relevant_chunks = rerank(query, relevant_chunks, top_k_for_reranker)
+    return relevant_chunks
 
 if __name__ == '__main__':
     '''create_embed('parsed_pages/hunter_parsed_pages.jsonl',

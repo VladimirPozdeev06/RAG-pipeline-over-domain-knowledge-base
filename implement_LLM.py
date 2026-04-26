@@ -195,6 +195,8 @@ def generate_response(
     is_hybrid:bool=False,
     relevant_chunk_ids=None,
     use_few_shot: bool = True,
+    use_reranker: bool = False,
+    top_k_for_reranker: int = 5
 
 ):
 
@@ -216,7 +218,10 @@ def generate_response(
                                            faiss_index=faiss_index, all_chunks=all_chunks, tokenized_chunks=tokenized_chunks,
                                            threshold=threshold,
                                            is_hybrid=is_hybrid,
-                                           retriever_model=retriever_model)
+                                           retriever_model=retriever_model,
+                                           use_reranker=use_reranker,
+                                           top_k_for_reranker=top_k_for_reranker
+                                           )
         ]
     else:
         if type(relevant_chunk_ids)==int:

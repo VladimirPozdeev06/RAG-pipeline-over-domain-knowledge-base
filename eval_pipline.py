@@ -36,6 +36,8 @@ def complete_eval_pipline(
     threshold = None,
     show_time: bool = False,
     return_time: bool = True,
+    use_reranker: bool = False,
+    top_k_for_reranker: int = 5,
 
 
     use_few_shot: bool = True,
@@ -125,7 +127,9 @@ def complete_eval_pipline(
                         threshold = threshold,
                         show_time=show_time,
                         retriever_model=retriever_model,
-                        is_hybrid=is_hybrid
+                        is_hybrid=is_hybrid,
+                        use_reranker = use_reranker,
+                        top_k_for_reranker = top_k_for_reranker
 
                         ),axis=1)
 
