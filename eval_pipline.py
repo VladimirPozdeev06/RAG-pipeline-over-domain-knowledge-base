@@ -49,7 +49,8 @@ def complete_eval_pipline(
     chunks_column: str ='chunks_from_retrieval',
     ground_truth_column: str = 'ground_truth_text',
     relevant_chunks_column: str = 'relevant_chunks',
-
+    number_of_samples: int = None,
+    column_to_stratify='language',
 
     # retrieval metrics
     is_retrieval_metrics: bool = False,
@@ -164,6 +165,8 @@ def complete_eval_pipline(
                                      top_k_hit = top_k_hit,
                                      top_k_nDCG=top_k_nDCG,
                                      is_context_precision=is_context_precision,
+                                     number_of_samples=number_of_samples,
+                                     column_to_stratify = column_to_stratify,
 
                                      )
 

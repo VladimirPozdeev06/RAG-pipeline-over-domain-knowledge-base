@@ -64,6 +64,8 @@ def context_precision(list_of_relevant_chunks:list,list_of_chunks:list):
 
 def generation_metrics(llm,
                                data_samples:pd.DataFrame=None,
+                               number_of_samples:int=None,
+                               column_to_stratify='language',
                                queries_column:str=None,
                                answers_column:str=None,
                                chunks_column:str=None,
@@ -72,6 +74,7 @@ def generation_metrics(llm,
                                answers:list[str]=None,
                                chunks_from_model:list[list[str]]=None,
                                ground_truth_text:list[str]=None):
+
     if data_samples is not None :
         if queries_column is None or answers_column is None or chunks_column is None or ground_truth_column is None:
             raise ValueError('Columns for data should be provided.')
@@ -79,6 +82,13 @@ def generation_metrics(llm,
                                                   answers_column:'response',
                                                   chunks_column:'retrieved_contexts',
                                                   ground_truth_column:'reference'})
+        if number_of_samples is not None:
+            per_group = number_of_samples // data_samples[column_to_stratify].nunique()
+            data_samples = (
+                data_samples
+                .groupby(column_to_stratify, group_keys=False)
+                .apply(lambda x: x.sample(min(len(x), per_group)))
+            )
         data = Dataset.from_pandas(data_samples)
 
 
@@ -150,6 +160,8 @@ def is_abstain(s):
     return any(k in s for k in ['not in', 'нет данных', 'cannot', 'не могу', 'no data'])
 def compute_all_metrics(       # generation_metrics
                                is_generation_metrics:bool=False,
+                               number_of_samples: int = None,
+                               column_to_stratify='language',
                                is_simple_generation_metrics:bool=False,
                                model_name:str='llama-3.3-70b-versatile',
                                data_samples:pd.DataFrame=None,
@@ -194,7 +206,9 @@ def compute_all_metrics(       # generation_metrics
                                queries_column = queries_column,
                                answers_column =answers_column,
                                chunks_column = chunks_column,
-                               ground_truth_column=ground_truth_column
+                               ground_truth_column=ground_truth_column,
+                               number_of_samples=number_of_samples,
+                               column_to_stratify = column_to_stratify,
         )
         print(score.mean(numeric_only=True))
         results['generation'] = score
