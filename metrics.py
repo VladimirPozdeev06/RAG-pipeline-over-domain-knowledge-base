@@ -272,7 +272,7 @@ def compute_all_metrics(       # generation_metrics
 
         if is_context_precision:
             context_precision_column = data_samples.apply(
-                lambda x: context_precision(x[relevant_chunks_column], x[chunks_column], k), axis=1
+                lambda x: context_precision(x[relevant_chunks_column], x[chunks_column]), axis=1
             )
             data_samples['context_precision'] = context_precision_column
             mean_context_precision = context_precision_column.mean()
